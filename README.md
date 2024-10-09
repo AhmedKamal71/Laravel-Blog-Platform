@@ -120,7 +120,11 @@ This is a RESTful API for a blog platform built using Laravel 10. The API suppor
 4. To create a new post you will need to send this token with the header in the request:
     Authorization   Bearer => the token <=
 
-5. Any request to add comment or create new post you will need the token 
+5. Any request to add comment or create new post you will need the token
+6. To use search and filteration you need to send the word you want to search for as a parameter in the request:
+   =>   GET http://localhost:8000/api/posts?category=News
+
+ 
 
 
 
