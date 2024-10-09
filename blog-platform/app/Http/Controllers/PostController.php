@@ -17,7 +17,15 @@ class PostController extends Controller
             'category' => 'required|in:Technology,Lifestyle,Education,News,Sports',
         ]);
 
+        $token = $request->bearerToken();
+        if (!$token) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $user = JWTAuth::parseToken()->authenticate();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorised'], 401);
+        }
 
         $post = Post::create([
             'title' => $validatedData['title'],
@@ -84,7 +92,11 @@ class PostController extends Controller
         $post = Post::find($id);
         $user = JWTAuth::parseToken()->authenticate();
 
-        if (!$post || ($post->author_id !== $user->id && $user->role !== 'admin')) {
+        if (!$post) {
+            return response()->json(['message' => 'Post not found'], 404);
+        }
+
+        if ($post->author_id !== $user->id && $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

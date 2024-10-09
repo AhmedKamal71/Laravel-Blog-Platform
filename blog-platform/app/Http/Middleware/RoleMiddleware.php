@@ -18,9 +18,10 @@ class RoleMiddleware
     {
         $user = JWTAuth::parseToken()->authenticate();
 
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if ($user && $user->role === 'admin') {
+            return $next($request);
         }
-        return $next($request);
+
+        return response()->json(['message' => 'Forbidden'], 403);
     }
 }
