@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Post;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Cache;
 
 class PostController extends Controller
 {
@@ -25,6 +26,8 @@ class PostController extends Controller
             'author_id' => $user->id,
         ]);
 
+        Cache::forget('posts');
+
         return response()->json(['message' => 'Post created successfully', 'post' => $post], 201);
     }
 
@@ -32,33 +35,42 @@ class PostController extends Controller
     {
         $validatedData = $request->validate([
             'category' => 'nullable|string|max:255',
+            'title' => 'nullable|string|max:255',
             'author_id' => 'nullable|integer|exists:users,id',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $query = Post::query();
+        $cacheKey = 'posts_' . md5(serialize($validatedData));
 
-        if ($request->has('category')) {
-            $query->where('category', $validatedData['category']);
-        }
+        $posts = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($validatedData) {
+            $query = Post::query();
 
-        if ($request->has('author_id')) {
-            $query->where('author_id', $validatedData['author_id']);
-        }
+            if (!empty($validatedData['category'])) {
+                $query->where('category', 'like', '%' . $validatedData['category'] . '%');
+            }
 
-        if ($request->has('date_from') && $request->has('date_to')) {
-            $query->whereBetween('created_at', [$validatedData['date_from'], $validatedData['date_to']]);
-        }
+            if (!empty($validatedData['title'])) {
+                $query->where('title', 'like', '%' . $validatedData['title'] . '%');
+            }
 
-        $posts = $query->paginate(10);
+            if (!empty($validatedData['author_id'])) {
+                $query->where('author_id', $validatedData['author_id']);
+            }
+
+            if (!empty($validatedData['date_from']) && !empty($validatedData['date_to'])) {
+                $query->whereBetween('created_at', [$validatedData['date_from'], $validatedData['date_to']]);
+            }
+
+            return $query->paginate(10);
+        });
 
         return response()->json($posts);
     }
 
     public function show($id)
     {
-        $post = Post::with('author')->find($id);
+        $post = Post::with('user')->find($id);
 
         if (!$post) {
             return response()->json(['message' => 'Post not found'], 404);
@@ -84,6 +96,8 @@ class PostController extends Controller
 
         $post->update($request->only('title', 'content', 'category'));
 
+        Cache::forget('posts');
+
         return response()->json(['message' => 'Post updated successfully', 'post' => $post]);
     }
 
@@ -92,11 +106,17 @@ class PostController extends Controller
         $post = Post::find($id);
         $user = JWTAuth::parseToken()->authenticate();
 
-        if (!$post || ($post->author_id !== $user->id && $user->role !== 'admin')) {
+        if (!$post) {
+            return response()->json(['message' => 'Post not found'], 404);
+        }
+
+        if ($post->author_id !== $user->id && $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $post->delete();
+
+        Cache::forget('posts');
 
         return response()->json(['message' => 'Post deleted successfully']);
     }

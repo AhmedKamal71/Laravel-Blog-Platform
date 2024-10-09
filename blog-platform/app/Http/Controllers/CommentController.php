@@ -74,4 +74,16 @@ class CommentController extends Controller
 
         return response()->json(['message' => 'Comment deleted successfully'], 200);
     }
+
+    public function index()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        if ($user->role === 'admin') {
+            $comments = Comment::all();
+            return response()->json(["All Comments" => $comments], 200);
+        } else {
+            $comments = Comment::where('user_id', $user->id)->get();
+            return response()->json(["Your Comments" => $comments], 200);
+        }
+    }
 }
